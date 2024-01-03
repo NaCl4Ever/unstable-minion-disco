@@ -6,13 +6,11 @@ module.exports = {
 		.setDescription('Create a goofy image'),
 	async execute(interaction) {
 		
-		interaction.reply('Yo yo yo i workin');
-		console.dir(interaction)
+		await interaction.reply('One silly lil pic comin right up');
 		GenImage("ultra realistic close up portrait ((beautiful pale cyberpunk female with heavy black eyeliner))")
-		.then(({data} ) => {		
-			interaction.channel.send({content: 'Here is an image'})
-			const attachment = [new Attachment(data.output[0])];
-			interaction.channel.send({content: 'Here is an image', files: attachment})
+		.then(async ( _ ) => {		
+			// const attachment = [new Attachment(data.output[0])];
+			await interaction.followUp({content: 'Worked so far'})
 		})
         .catch(e => console.error(e.message)
 		);
