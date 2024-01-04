@@ -6,6 +6,6 @@ module.exports = {
 		.setDescription('Create a goofy image'),
 	async execute(interaction) {		
 		await interaction.reply('One silly lil pic comin right up');
-		await GenImage("", interaction);		
+		GenImage("", interaction);		
 	},
 };

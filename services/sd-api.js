@@ -16,91 +16,97 @@ exports.queuePrompt = async(prompt) => {
         url: `http://${serverAddr}/prompt`,
         data: {
             "prompt": {
-                "3": {
-                    "class_type": "KSampler",
-                    "inputs": {
-                        "cfg": 8,
-                        "denoise": 1,
-                        "latent_image": [
-                            "5",
-                            0
-                        ],
-                        "model": [
-                            "4",
-                            0
-                        ],
-                        "negative": [
-                            "7",
-                            0
-                        ],
-                        "positive": [
-                            "6",
-                            0
-                        ],
-                        "sampler_name": "euler",
-                        "scheduler": "normal",
-                        "seed": Math.random() * 100000,
-                        "steps": 40
-                    }
+                "57": {
+                  "inputs": {
+                    "ckpt_name": "perfectdeliberate_v40.safetensors"
+                  },
+                  "class_type": "CheckpointLoaderSimple"
                 },
-                "4": {
-                    "class_type": "CheckpointLoaderSimple",
-                    "inputs": {
-                        "ckpt_name": "realcartoonRealistic_v8.safetensors"
-                    }
+                "58": {
+                  "inputs": {
+                    "seed": 829086049819405,
+                    "steps": 30,
+                    "cfg": 8,
+                    "sampler_name": "euler",
+                    "scheduler": "normal",
+                    "denoise": 1,
+                    "model": [
+                      "57",
+                      0
+                    ],
+                    "positive": [
+                      "59",
+                      0
+                    ],
+                    "negative": [
+                      "60",
+                      0
+                    ],
+                    "latent_image": [
+                      "61",
+                      0
+                    ]
+                  },
+                  "class_type": "KSampler"
                 },
-                "5": {
-                    "class_type": "EmptyLatentImage",
-                    "inputs": {
-                        "batch_size": 1,
-                        "height": 512,
-                        "width": 512
-                    }
+                "59": {
+                  "inputs": {
+                    "text": "masterpiece best quality, girl, lovely evening dress, long black hair, solid white background",
+                    "clip": [
+                      "57",
+                      1
+                    ]
+                  },
+                  "class_type": "CLIPTextEncode"
                 },
-                "6": {
-                    "class_type": "CLIPTextEncode",
-                    "inputs": {
-                        "clip": [
-                            "4",
-                            1
-                        ],
-                        "text": "masterpiece best quality girl, lovely evening dress"
-                    }
+                "60": {
+                  "inputs": {
+                    "text": "extra limbs, watermark, ugly",
+                    "clip": [
+                      "57",
+                      1
+                    ]
+                  },
+                  "class_type": "CLIPTextEncode"
                 },
-                "7": {
-                    "class_type": "CLIPTextEncode",
-                    "inputs": {
-                        "clip": [
-                            "4",
-                            1
-                        ],
-                        "text": "bad hands"
-                    }
+                "61": {
+                  "inputs": {
+                    "width": 512,
+                    "height": 512,
+                    "batch_size": 1
+                  },
+                  "class_type": "EmptyLatentImage"
                 },
-                "8": {
-                    "class_type": "VAEDecode",
-                    "inputs": {
-                        "samples": [
-                            "3",
-                            0
-                        ],
-                        "vae": [
-                            "4",
-                            2
-                        ]
-                    }
+                "62": {
+                  "inputs": {
+                    "samples": [
+                      "58",
+                      0
+                    ],
+                    "vae": [
+                      "79",
+                      0
+                    ]
+                  },
+                  "class_type": "VAEDecode"
                 },
-                "9": {
-                    "class_type": "SaveImage",
-                    "inputs": {
-                        "filename_prefix": "ComfyUI",
-                        "images": [
-                            "8",
-                            0
-                        ]
-                    }
+                "77": {
+                  "inputs": {
+                    "filename_prefix": "chat-bot",
+                    "images": [
+                      "62",
+                      0
+                    ]
+                  },
+                  "class_type": "SaveImage"
+                },
+                "79": {
+                  "inputs": {
+                    "vae_name": "vae-ft-mse-840000-ema-pruned.safetensors"
+                  },
+                  "class_type": "VAELoader"
                 }
-            }
+              }
         }        
       })
 }
@@ -121,16 +127,19 @@ exports.getImage = async(filename, subfolder, folder_type) => {
 }
 
 exports.gatherImages = async(ws, prompt, interaction) => {
+    console.log('Gather invoked')
     const {data: {prompt_id}} = await this.queuePrompt(prompt);
     let output_images = [];
     let inProgress = false;
     let runStarted = false;
-    ws.on('message', async (data) => {
-        const parsed = JSON.parse(data);        
+    const onMessage = async (data) => {
+        const parsed = JSON.parse(data);            
         if(parsed?.data?.sid) {
+            console.log('Sid found');
             inProgress = true;
             runStarted = true;
         } else if(runStarted && inProgress && parsed?.data?.status?.exec_info?.queue_remaining === 0) {
+            console.log('Getting history')
             let {data: history} = await this.getHistory(prompt_id);
             history = history[prompt_id]
             for(o in history.outputs) {
@@ -148,12 +157,15 @@ exports.gatherImages = async(ws, prompt, interaction) => {
                     
                 }
             }
-            console.log("Follow up", output_images)
             await interaction.followUp({content: 'Here you go!', files: output_images})
+            console.log('Finishing with images')
+            ws.removeListener('message', onMessage)
+            ws.close();
         }
+    }
 
-       
-    })    
+
+    ws.on('message', onMessage)    
 
    
 }
@@ -161,7 +173,10 @@ exports.gatherImages = async(ws, prompt, interaction) => {
 
 exports.GenImage = async(prompt, interaction) => {
     const ws = new WebSocket(`ws://${serverAddr}/ws?clientId=${client_id}`);
-   
-    return this.gatherImages(ws, prompt, interaction);
+    ws.on('close', (code) => {
+        console.log('Closing ws', code)
+    })
+    console.log('gathering images')
+    const res = await this.gatherImages(ws, prompt, interaction);
 
 }
