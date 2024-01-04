@@ -127,19 +127,18 @@ exports.getImage = async(filename, subfolder, folder_type) => {
 }
 
 exports.gatherImages = async(ws, prompt, interaction) => {
-    console.log('Gather invoked')
-    const {data: {prompt_id}} = await this.queuePrompt(prompt);
-    let output_images = [];
+    console.log('Beginning image creation step')
+    const {data: {prompt_id}} = await this.queuePrompt(prompt);    
     let inProgress = false;
-    let runStarted = false;
+    let runStarted = false;            
     const onMessage = async (data) => {
-        const parsed = JSON.parse(data);            
-        if(parsed?.data?.sid) {
-            console.log('Sid found');
+        const parsed = JSON.parse(data);
+        let output_images = [];
+        if(parsed?.data?.status?.exec_info?.queue_remaining === 1) {
             inProgress = true;
             runStarted = true;
         } else if(runStarted && inProgress && parsed?.data?.status?.exec_info?.queue_remaining === 0) {
-            console.log('Getting history')
+            console.log('Image has been created processing now')
             let {data: history} = await this.getHistory(prompt_id);
             history = history[prompt_id]
             for(o in history.outputs) {
@@ -158,7 +157,6 @@ exports.gatherImages = async(ws, prompt, interaction) => {
                 }
             }
             await interaction.followUp({content: 'Here you go!', files: output_images})
-            console.log('Finishing with images')
             ws.removeListener('message', onMessage)
             ws.close();
         }
